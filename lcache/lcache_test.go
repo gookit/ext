@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gookit/ext/lcache"
 	"github.com/gookit/goutil/testutil/assert"
-	"github.com/gookit/goutil/x/lcache"
 )
 
 func TestSetAndGet(t *testing.T) {
@@ -35,6 +35,21 @@ func TestSetAndGet(t *testing.T) {
 		assert.False(t, found)
 		assert.Equal(t, zero, result)
 	})
+}
+
+func TestMGetAndMSet(t *testing.T) {
+	keys := []string{"key1", "key2"}
+	lcache.MSet(map[string]any{"key1": "value1", "key2": "value2"}, 1*time.Second)
+
+	result := lcache.MGet(keys...)
+	assert.ContainsKeys(t, result, keys)
+
+	assert.Equal(t, "value1", lcache.Val("key1"))
+	assert.Equal(t, "value2", lcache.Val("key2"))
+
+	val, ok := lcache.Any("key1")
+	assert.True(t, ok)
+	assert.Equal(t, "value1", val)
 }
 
 func TestKeys(t *testing.T) {
@@ -79,26 +94,31 @@ func TestDelete(t *testing.T) {
 	assert.False(t, found)
 }
 
-func TestSaveFileAndLoadFile(t *testing.T) {
-	t.Run("json", func(t *testing.T) {
-		lcache.Configure(lcache.WithCapacity(50))
-		filename := "testdata/test_cache.json"
-		saveFileAndLoadFile(filename, t)
+func TestOptions(t *testing.T) {
+	assert.Panics(t, func() {
+		lcache.Configure(lcache.WithSerializer("json2"))
 	})
 
-	// t.Run("gob", func(t *testing.T) {
-	// 	lcache.Configure(lcache.WithSerializer("gob"))
-	// 	filename := "testdata/test_cache.gob"
-	// 	saveFileAndLoadFile(filename, t)
-	// 	lcache.Configure(lcache.WithSerializer("json"))
-	// })
+	lcache.SetSerializer("json2", lcache.JSONSerializer{})
+	assert.NotPanics(t, func() {
+		lcache.Configure(lcache.WithSerializer("json2"))
+	})
+
+	// delete serializer
+	lcache.SetSerializer("json2", nil)
+	assert.Panics(t, func() {
+		lcache.Configure(lcache.WithSerializer("json2"))
+	})
+	lcache.Reset()
 }
 
-func saveFileAndLoadFile(filename string, t *testing.T) {
+func TestSaveFileAndLoadFile(t *testing.T) {
+	lcache.Configure(lcache.WithCapacity(50))
 	lcache.Clear()
-
 	lcache.Set("key1", "value1", 10*time.Second)
 	lcache.Set("key2", "value2", 10*time.Second)
+
+	filename := "testdata/test_cache.json"
 	err := lcache.SaveFile(filename)
 	assert.NoError(t, err)
 

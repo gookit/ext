@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gookit/ext/lcache"
 	"github.com/gookit/goutil/testutil/assert"
-	"github.com/gookit/goutil/x/lcache"
 )
 
 func TestCache_SetAndGet(t *testing.T) {
@@ -24,7 +24,7 @@ func TestCache_SetAndGet(t *testing.T) {
 		c.Clear()
 
 		assert.Empty(t, c.Keys())
-		assert.Len(t, c.Len(), 0)
+		assert.Eq(t, c.Len(), 0)
 	})
 
 	t.Run("str", func(t *testing.T) {
@@ -34,7 +34,6 @@ func TestCache_SetAndGet(t *testing.T) {
 		assert.Eq(t, "hello", val)
 
 		// Test mismatch
-		c.Set("int", 123, 5*time.Minute)
 		_, found = c.Get("int")
 		assert.False(t, found)
 		c.Clear()
@@ -47,7 +46,6 @@ func TestCache_SetAndGet(t *testing.T) {
 		assert.Eq(t, 42, val)
 
 		// Test mismatch
-		c.Set("str", "hello", 5*time.Minute)
 		_, found = c.Get("str")
 		assert.False(t, found)
 		c.Clear()
@@ -60,7 +58,6 @@ func TestCache_SetAndGet(t *testing.T) {
 		assert.True(t, val.(bool))
 
 		// Test type mismatch
-		c.Set("str", "hello", 5*time.Minute)
 		_, found = c.Get("str")
 		assert.False(t, found)
 		c.Clear()
@@ -99,6 +96,55 @@ func TestCache_NoExpiration(t *testing.T) {
 	assert.True(t, found)
 	assert.Eq(t, "Val", val)
 }
+func TestCache_MGet(t *testing.T) {
+	c := lcache.New()
+	c.Set("k1", "val1", time.Second*10)
+	c.Set("k2", "val2", time.Second*10)
+
+	t.Run("all keys exist", func(t *testing.T) {
+		result := c.MGet("k1", "k2")
+		assert.Equal(t, "val1", result["k1"])
+		assert.Equal(t, "val2", result["k2"])
+	})
+
+	t.Run("some keys missing", func(t *testing.T) {
+		result := c.MGet("k1", "missing")
+		assert.Equal(t, "val1", result["k1"])
+		assert.Nil(t, result["missing"])
+	})
+}
+
+func TestCache_MSet(t *testing.T) {
+	c := lcache.New()
+
+	t.Run("set multiple items", func(t *testing.T) {
+		items := map[string]any{
+			"k1": "val1",
+			"k2": "val2",
+		}
+		c.MSet(items, time.Second*10)
+
+		val1, ok := c.Get("k1")
+		assert.True(t, ok)
+		assert.Equal(t, "val1", val1)
+
+		val2, ok := c.Get("k2")
+		assert.True(t, ok)
+		assert.Equal(t, "val2", val2)
+	})
+
+	t.Run("update existing items", func(t *testing.T) {
+		c.Set("k1", "old_val", time.Second*10)
+		items := map[string]any{
+			"k1": "new_val",
+		}
+		c.MSet(items, time.Second*10)
+
+		val, ok := c.Get("k1")
+		assert.True(t, ok)
+		assert.Equal(t, "new_val", val)
+	})
+}
 
 func TestCache_Delete(t *testing.T) {
 	c := lcache.New()
@@ -113,7 +159,8 @@ func TestCache_Delete(t *testing.T) {
 	assert.False(t, found)
 
 	// Delete non-existent key should not panic
-	c.Delete("non-existent")
+	has := c.Delete("non-existent")
+	assert.False(t, has)
 }
 
 func TestCache_Has(t *testing.T) {

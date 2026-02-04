@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/gookit/goutil/x/lcache"
+	"github.com/gookit/ext/lcache"
 )
 
 func ExampleCache() {
@@ -32,7 +32,6 @@ func ExampleCache_withOptions() {
 	// Create cache with custom settings
 	cache := lcache.New(
 		lcache.WithCapacity(10),
-		lcache.WithSerializer("gob"),
 		lcache.WithOnEvictFn(func(key string, value any) {
 			buf.WriteString(fmt.Sprintf("Evicting %s: %v\n", key, value))
 		}),

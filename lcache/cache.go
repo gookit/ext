@@ -97,6 +97,12 @@ func (c *Cache) Set(key string, value any, ttl time.Duration) {
 	c.lruMap[key] = elem
 }
 
+// Val get value by key, not return exists
+func (c *Cache) Val(key string) any {
+	val, _ := c.Get(key)
+	return val
+}
+
 // Get retrieves an item from the cache.
 // Returns the Val and true if found and not expired, otherwise nil and false.
 func (c *Cache) Get(key string) (any, bool) {
@@ -119,6 +125,61 @@ func (c *Cache) Get(key string) (any, bool) {
 		c.lruList.MoveToFront(elem)
 	}
 	return it.Val, true
+}
+
+// MGet get the values corresponding to multiple keys in batches
+func (c *Cache) MGet(keys ...string) map[string]any {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	result := make(map[string]any, len(keys))
+	nowUm := time.Now().UnixMilli()
+
+	for _, key := range keys {
+		it, ok := c.items[key]
+		if !ok || it.isExpired1(nowUm) {
+			result[key] = nil
+			continue
+		}
+
+		// 更新 LRU 位置
+		if elem, ok := c.lruMap[key]; ok {
+			c.lruList.MoveToFront(elem)
+		}
+		result[key] = it.Val
+	}
+
+	return result
+}
+
+// MSet set multiple key-value pairs in bulk
+func (c *Cache) MSet(items map[string]any, ttl time.Duration) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	var exp int64
+	if ttl > 0 {
+		exp = time.Now().Add(ttl).UnixMilli()
+	}
+
+	for key, value := range items {
+		// 如果 key 已存在，更新值并移动到 LRU 头部
+		if elem, ok := c.lruMap[key]; ok {
+			c.lruList.MoveToFront(elem)
+			c.items[key] = &Item{Val: value, Exp: exp}
+			continue
+		}
+
+		// 检查容量并执行淘汰
+		if c.lruList.Len() >= c.opt.Capacity {
+			c.evict()
+		}
+
+		// 添加新项
+		c.items[key] = &Item{Val: value, Exp: exp}
+		elem := c.lruList.PushFront(key)
+		c.lruMap[key] = elem
+	}
 }
 
 // Has checks if an item exists in the cache.
@@ -177,24 +238,28 @@ func (c *Cache) reset() {
 }
 
 // Delete removes an item from the cache
-func (c *Cache) Delete(key string) {
+func (c *Cache) Delete(key string) bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.removeElement(key)
+	return c.removeElement(key)
 }
 
 // removeElement 内部删除方法 (不加锁)
-func (c *Cache) removeElement(key string) {
+func (c *Cache) removeElement(key string) (exists bool) {
 	if elem, ok := c.lruMap[key]; ok {
 		c.lruList.Remove(elem)
 		delete(c.lruMap, key)
+		exists = true
 	}
+
 	if it, ok := c.items[key]; ok {
+		exists = true
 		delete(c.items, key)
 		if c.opt.OnEvicted != nil {
 			c.opt.OnEvicted(key, it.Val)
 		}
 	}
+	return
 }
 
 // evict 淘汰最久未使用的项

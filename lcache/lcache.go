@@ -17,11 +17,18 @@
 package lcache
 
 import (
+	"encoding/json"
+	"io"
 	"time"
+
+	"github.com/gookit/goutil/comdef"
 )
 
 // std 默认的全局缓存实例
 var std = New()
+
+// Reset the default cache instance
+func Reset() { std = New() }
 
 // Configure the default cache settings
 func Configure(optFns ...OptionFn) { std.Configure(optFns...) }
@@ -32,19 +39,10 @@ func Set[T any](key string, val T, ttl time.Duration) {
 }
 
 // Val get value by key
-func Val(key string) any {
-	val, _ := std.Get(key)
-	return val
-}
+func Val(key string) any { return std.Val(key) }
 
 // Any get any type value by key
-func Any(key string) (any, bool) {
-	val, ok := std.Get(key)
-	if !ok {
-		return nil, false
-	}
-	return val, true
-}
+func Any(key string) (val any, ok bool) { return std.Get(key) }
 
 // Get typed value by key, return zero value if not found
 func Get[T any](key string) (T, bool) {
@@ -61,6 +59,12 @@ func Get[T any](key string) (T, bool) {
 	}
 	return res, true
 }
+
+// MGet get multiple key-value pairs from the cache.
+func MGet(keys ...string) map[string]any { return std.MGet(keys...) }
+
+// MSet set multiple key-value pairs in the cache.
+func MSet(items map[string]any, ttl time.Duration) { std.MSet(items, ttl) }
 
 // Keys get the keys of the default cache
 func Keys() []string { return std.Keys() }
@@ -83,6 +87,56 @@ func SaveFile(filename string) error {
 func LoadFile(filename string) error {
 	return std.LoadFile(filename)
 }
+
+//
+// ----- builtin serializers -----
+//
+
+type Serializer interface {
+	comdef.Codec
+	DecodeFrom(r io.Reader, dest any) error
+	EncodeTo(w io.Writer, src any) error
+}
+
+var serializers = map[string]Serializer{
+	"json": JSONSerializer{},
+}
+
+// SetSerializer set new serializer for the cache. if serializer is nil, delete it
+func SetSerializer(name string, serializer Serializer) {
+	if serializer != nil {
+		serializers[name] = serializer
+	} else {
+		delete(serializers, name)
+	}
+}
+
+// JSONSerializer builtin serializer: json, gob
+type JSONSerializer struct{}
+
+// Decode implements Serializer
+func (j JSONSerializer) Decode(data []byte, dest any) error {
+	return json.Unmarshal(data, dest)
+}
+
+// Encode implements Serializer
+func (j JSONSerializer) Encode(data any) ([]byte, error) {
+	return json.Marshal(data)
+}
+
+// DecodeFrom implements Serializer
+func (j JSONSerializer) DecodeFrom(r io.Reader, dest any) error {
+	return json.NewDecoder(r).Decode(dest)
+}
+
+// EncodeTo implements Serializer
+func (j JSONSerializer) EncodeTo(w io.Writer, src any) error {
+	return json.NewEncoder(w).Encode(src)
+}
+
+//
+// ----- options for cache -----
+//
 
 // Options for cache
 type Options struct {
