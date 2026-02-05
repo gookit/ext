@@ -1,9 +1,5 @@
 # LCache
 
-![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/gookit/ext?style=flat-square)
-[![Go Report Card](https://goreportcard.com/badge/github.com/gookit/ext/lcache)](https://goreportcard.com/report/github.com/gookit/ext/lcache)
-[![Go Reference](https://pkg.go.dev/badge/github.com/gookit/ext.svg)](https://pkg.go.dev/github.com/gookit/ext/lcache)
-
 简单、协程安全的本地内存缓存包，提供 TTL 过期支持、LRU 淘汰策略和文件持久化功能。
 
 > **[English README](README.md)**

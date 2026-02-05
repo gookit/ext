@@ -1,9 +1,5 @@
 # LCache
 
-![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/gookit/ext?style=flat-square)
-[![Go Report Card](https://goreportcard.com/badge/github.com/gookit/ext/lcache)](https://goreportcard.com/report/github.com/gookit/ext/lcache)
-[![Go Reference](https://pkg.go.dev/badge/github.com/gookit/ext.svg)](https://pkg.go.dev/github.com/gookit/ext/lcache)
-
 Simple, goroutine-safe local cache package with TTL expiration support, LRU eviction policy, and file persistence.
 
 > **[中文说明](README.zh-CN.md)**
