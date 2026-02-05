@@ -1,4 +1,4 @@
-// Package lcache provides a simple, thread-safe local cache implementation with TTL support.
+// Package lcache provides a simple, goroutine-safe local cache implementation with TTL support.
 //
 // Quickly usage:
 //
