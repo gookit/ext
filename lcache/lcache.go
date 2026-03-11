@@ -12,7 +12,7 @@
 // Custom configuration:
 //
 //	cache := lcache.New(
-// 		lcache.WithCapacity(10),
+//		lcache.WithCapacity(10),
 //	)
 package lcache
 
@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/gookit/goutil/comdef"
+	"github.com/gookit/goutil/strutil"
 )
 
 // std 默认的全局缓存实例
@@ -33,16 +34,16 @@ func Reset() { std = New() }
 // Configure the default cache settings
 func Configure(optFns ...OptionFn) { std.Configure(optFns...) }
 
-// Set value by key with TTL
-func Set[T any](key string, val T, ttl time.Duration) {
-	std.Set(key, val, ttl)
-}
-
 // Val get value by key
 func Val(key string) any { return std.Val(key) }
 
 // Any get any type value by key
 func Any(key string) (val any, ok bool) { return std.Get(key) }
+
+// Set value by key with TTL
+func Set[T any](key string, val T, ttl time.Duration) {
+	std.Set(key, val, ttl)
+}
 
 // Get typed value by key, return zero value if not found
 func Get[T any](key string) (T, bool) {
@@ -66,6 +67,81 @@ func MGet(keys ...string) map[string]any { return std.MGet(keys...) }
 // MSet set multiple key-value pairs in the cache.
 func MSet(items map[string]any, ttl time.Duration) { std.MSet(items, ttl) }
 
+// CacheNotExist 表示缓存不存在的特殊值，避免缓存穿透
+var CacheNotExist = "_cache_not_exist_"
+
+// MGetOrFind 根据key prefix + keys(eg: ids) 批量获取缓存值，不存在则调用回调函数获取(DB)数据
+//
+// 示例：
+//
+//	ids := []uint{1, 2, 3}
+//	userList := cache.MGetElse("user:", ids, cacheTTL, func(keys []uint) map[uint]*models.User {
+//			return db.ListByIDs(keys)
+//	})
+func MGetOrFind[K comdef.SimpleType, T any](keyPrefix string, keys []K, cacheTTL time.Duration, queryFn func(keys []K) map[K]T) []T {
+	if len(keys) == 0 {
+		return make([]T, 0)
+	}
+
+	// 构建完整的缓存键list
+	fullKeys := make([]string, 0, len(keys))
+	keyMap := make(map[string]K, len(keys))
+	for _, key := range keys {
+		keyStr := strutil.SafeString(key)
+		fullKeys = append(fullKeys, keyPrefix+keyStr)
+		keyMap[keyStr] = key
+	}
+
+	dataList := make([]T, 0, len(keys))
+	// 从缓存中获取值
+	itemList := std.MGet(fullKeys...)
+
+	var missKeys []K
+	foundKeyMap := make(map[string]K)
+	for fullKey, item := range itemList {
+		keyStr := fullKey[len(keyPrefix):]
+
+		// 当缓存值为 CacheNotExist 时，跳过。但是记录为已找到
+		if str, ok := item.(string); ok && str == CacheNotExist {
+			foundKeyMap[keyStr] = keyMap[keyStr]
+			continue
+		}
+
+		if val, ok := item.(T); ok {
+			dataList = append(dataList, val)
+			foundKeyMap[keyStr] = keyMap[keyStr]
+		}
+	}
+
+	for _, key := range keys {
+		if _, ok := foundKeyMap[strutil.SafeString(key)]; !ok {
+			missKeys = append(missKeys, key)
+		}
+	}
+	if len(missKeys) == 0 {
+		return dataList
+	}
+
+	// 调用回调函数获取缺失的缓存值
+	missDataMap := queryFn(missKeys)
+	netSetMap := make(map[string]any, len(missKeys))
+
+	// 合并结果
+	for _, key := range missKeys {
+		keyStr := strutil.SafeString(key)
+		if val, ok := missDataMap[key]; ok {
+			dataList = append(dataList, val)
+			netSetMap[keyStr] = val
+		} else {
+			// 设置一个特殊值表示缓存不存在，避免缓存穿透
+			netSetMap[keyStr] = CacheNotExist
+		}
+	}
+
+	std.MSet(netSetMap, cacheTTL)
+	return dataList
+}
+
 // Keys get the keys of the default cache
 func Keys() []string { return std.Keys() }
 
@@ -77,6 +153,9 @@ func Clear() { std.Clear() }
 
 // Delete key
 func Delete(key string) { std.Delete(key) }
+
+// MDelete delete multiple keys
+func MDelete(keys ...string) { std.MDelete(keys...) }
 
 // SaveFile Save the cache data to a file.
 func SaveFile(filename string) error {

@@ -237,6 +237,16 @@ func (c *Cache) reset() {
 	c.lruList.Init()
 }
 
+// MDelete removes multiple items from the cache
+func (c *Cache) MDelete(keys ...string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	for _, key := range keys {
+		c.removeElement(key)
+	}
+}
+
 // Delete removes an item from the cache
 func (c *Cache) Delete(key string) bool {
 	c.mu.Lock()
@@ -348,4 +358,3 @@ func (c *Cache) LoadFile(filename string) error {
 
 	return nil
 }
-
