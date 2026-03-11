@@ -47,8 +47,63 @@ func Set[T any](key string, val T, ttl time.Duration) {
 
 // Get typed value by key, return zero value if not found
 func Get[T any](key string) (T, bool) {
+	return TypedInCache[T](std, key)
+}
+
+// MGet get multiple key-value pairs from the cache.
+func MGet(keys ...string) map[string]any { return std.MGet(keys...) }
+
+// MSet set multiple key-value pairs in the cache.
+func MSet(items map[string]any, ttl time.Duration) { std.MSet(items, ttl) }
+
+// CacheNotExist 表示缓存不存在的特殊值，避免缓存穿透
+var CacheNotExist = "_cache_not_exist_"
+
+// MGetOrFind 根据key prefix + keys(eg: ids) 批量获取缓存值，不存在则调用回调函数获取(eg: DB)数据
+//
+// 示例：
+//
+//	ids := []uint{1, 2, 3}
+//	userList := cache.MGetElse("user:", ids, cacheTTL, func(keys []uint) map[uint]*models.User {
+//			return db.ListByIDs(keys)
+//	})
+func MGetOrFind[K comdef.SimpleType, T any](keyPrefix string, keys []K, cacheTTL time.Duration, queryFn func(keys []K) map[K]T) []T {
+	return MGetCacheOrFind(std, keyPrefix, keys, cacheTTL, queryFn)
+}
+
+// Keys get the keys of the default cache
+func Keys() []string { return std.Keys() }
+
+// Len get the number of items in the cache
+func Len() int { return std.Len() }
+
+// Clear all items from the default cache
+func Clear() { std.Clear() }
+
+// Delete key
+func Delete(key string) { std.Delete(key) }
+
+// MDelete delete multiple keys
+func MDelete(keys ...string) { std.MDelete(keys...) }
+
+// SaveFile Save the cache data to a file.
+func SaveFile(filename string) error {
+	return std.SaveFile(filename)
+}
+
+// LoadFile Recover cache data from file load
+func LoadFile(filename string) error {
+	return std.LoadFile(filename)
+}
+
+//
+// ----- extend helpers -----
+//
+
+// Get typed value by key, return zero value if not found
+func TypedInCache[T any](c *Cache, key string) (T, bool) {
 	var zero T // 零值
-	val, ok := std.Get(key)
+	val, ok := c.Get(key)
 	if !ok {
 		return zero, false
 	}
@@ -61,24 +116,8 @@ func Get[T any](key string) (T, bool) {
 	return res, true
 }
 
-// MGet get multiple key-value pairs from the cache.
-func MGet(keys ...string) map[string]any { return std.MGet(keys...) }
-
-// MSet set multiple key-value pairs in the cache.
-func MSet(items map[string]any, ttl time.Duration) { std.MSet(items, ttl) }
-
-// CacheNotExist 表示缓存不存在的特殊值，避免缓存穿透
-var CacheNotExist = "_cache_not_exist_"
-
-// MGetOrFind 根据key prefix + keys(eg: ids) 批量获取缓存值，不存在则调用回调函数获取(DB)数据
-//
-// 示例：
-//
-//	ids := []uint{1, 2, 3}
-//	userList := cache.MGetElse("user:", ids, cacheTTL, func(keys []uint) map[uint]*models.User {
-//			return db.ListByIDs(keys)
-//	})
-func MGetOrFind[K comdef.SimpleType, T any](keyPrefix string, keys []K, cacheTTL time.Duration, queryFn func(keys []K) map[K]T) []T {
+// MGetCacheOrFind 根据key prefix + keys(eg: ids) 批量获取缓存值，不存在则调用回调函数获取(DB)数据
+func MGetCacheOrFind[K comdef.SimpleType, T any](c *Cache, prefix string, keys []K, cacheTTL time.Duration, queryFn func(keys []K) map[K]T) []T {
 	if len(keys) == 0 {
 		return make([]T, 0)
 	}
@@ -88,18 +127,18 @@ func MGetOrFind[K comdef.SimpleType, T any](keyPrefix string, keys []K, cacheTTL
 	keyMap := make(map[string]K, len(keys))
 	for _, key := range keys {
 		keyStr := strutil.SafeString(key)
-		fullKeys = append(fullKeys, keyPrefix+keyStr)
+		fullKeys = append(fullKeys, prefix+keyStr)
 		keyMap[keyStr] = key
 	}
 
 	dataList := make([]T, 0, len(keys))
 	// 从缓存中获取值
-	itemList := std.MGet(fullKeys...)
+	itemList := c.MGet(fullKeys...)
 
 	var missKeys []K
 	foundKeyMap := make(map[string]K)
 	for fullKey, item := range itemList {
-		keyStr := fullKey[len(keyPrefix):]
+		keyStr := fullKey[len(prefix):]
 
 		// 当缓存值为 CacheNotExist 时，跳过。但是记录为已找到
 		if str, ok := item.(string); ok && str == CacheNotExist {
@@ -138,33 +177,8 @@ func MGetOrFind[K comdef.SimpleType, T any](keyPrefix string, keys []K, cacheTTL
 		}
 	}
 
-	std.MSet(netSetMap, cacheTTL)
+	c.MSet(netSetMap, cacheTTL)
 	return dataList
-}
-
-// Keys get the keys of the default cache
-func Keys() []string { return std.Keys() }
-
-// Len get the number of items in the cache
-func Len() int { return std.Len() }
-
-// Clear all items from the default cache
-func Clear() { std.Clear() }
-
-// Delete key
-func Delete(key string) { std.Delete(key) }
-
-// MDelete delete multiple keys
-func MDelete(keys ...string) { std.MDelete(keys...) }
-
-// SaveFile Save the cache data to a file.
-func SaveFile(filename string) error {
-	return std.SaveFile(filename)
-}
-
-// LoadFile Recover cache data from file load
-func LoadFile(filename string) error {
-	return std.LoadFile(filename)
 }
 
 //

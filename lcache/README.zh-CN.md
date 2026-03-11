@@ -39,16 +39,16 @@ func main() {
     // 设置带 TTL 的值
     lcache.Set("name", "John", 5*time.Minute)
     lcache.Set("age", 30, 0) // 永不过期
-    
+
     // 获取值
     if name, ok := lcache.Get[string]("name"); ok {
         fmt.Printf("姓名: %s\n", name)
     }
-    
+
     if age, ok := lcache.Get[int]("age"); ok {
         fmt.Printf("年龄: %d\n", age)
     }
-    
+
     // 获取任意类型（返回 interface{}）
     if val, ok := lcache.Any("name"); ok {
         fmt.Printf("值: %v\n", val)
@@ -76,21 +76,21 @@ func main() {
         }),
     )
     defer cache.Clear()
-    
+
     // 设置和获取值
     cache.Set("key1", "value1", time.Hour)
     cache.Set("key2", 42, 30*time.Minute)
-    
+
     if val, ok := cache.Get("key1"); ok {
         fmt.Printf("获取到: %v\n", val)
     }
-    
+
     // 批量操作
     cache.MSet(map[string]any{
         "batch1": "data1",
         "batch2": "data2",
     }, time.Hour)
-    
+
     results := cache.MGet("batch1", "batch2", "missing")
     fmt.Printf("批量结果: %+v\n", results)
 }
@@ -203,6 +203,10 @@ func Clear()
 func MGet(keys ...string) map[string]any
 // 设置多个值
 func MSet(items map[string]any, ttl time.Duration)
+// MDelete delete multiple keys
+func MDelete(keys ...string)
+// MGetOrFind 根据key prefix + keys(eg: ids) 批量获取缓存值，不存在则调用回调函数获取(eg: DB)数据
+func MGetOrFind[K comdef.SimpleType, T any](keyPrefix string, keys []K, cacheTTL time.Duration, queryFn func(keys []K) map[K]T) []T
 ```
 
 #### 持久化
