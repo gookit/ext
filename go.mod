@@ -2,7 +2,7 @@ module github.com/gookit/ext
 
 go 1.23
 
-require github.com/gookit/goutil v0.7.3
+require github.com/gookit/goutil v0.7.4
 
 require (
 	golang.org/x/sys v0.30.0 // indirect
