@@ -205,8 +205,10 @@ func MGet(keys ...string) map[string]any
 func MSet(items map[string]any, ttl time.Duration)
 // MDelete delete multiple keys
 func MDelete(keys ...string)
-// MGetOrFind 根据key prefix + keys(eg: ids) 批量获取缓存值，不存在则调用回调函数获取(eg: DB)数据
-func MGetOrFind[K comdef.SimpleType, T any](keyPrefix string, keys []K, cacheTTL time.Duration, queryFn func(keys []K) map[K]T) []T
+// MGetOrElse 根据key prefix + keys(eg: ids) 批量获取缓存值，不存在则调用回调函数获取(eg: DB)数据
+func MGetOrElse[K comdef.SimpleType, T any](
+    keyPrefix string, keys []K, cacheTTL time.Duration, queryFn func(keys []K) (map[K]T, error),
+) ([]T, error)
 ```
 
 #### 持久化

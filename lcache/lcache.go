@@ -59,7 +59,7 @@ func MSet(items map[string]any, ttl time.Duration) { std.MSet(items, ttl) }
 // CacheNotExist 表示缓存不存在的特殊值，避免缓存穿透
 var CacheNotExist = "_cache_not_exist_"
 
-// MGetOrFind 根据key prefix + keys(eg: ids) 批量获取缓存值，不存在则调用回调函数获取(eg: DB)数据
+// MGetOrElse 根据key prefix + keys(eg: ids) 批量获取缓存值，不存在则调用回调函数获取(eg: DB)数据
 //
 // 示例：
 //
@@ -67,8 +67,13 @@ var CacheNotExist = "_cache_not_exist_"
 //	userList := cache.MGetElse("user:", ids, cacheTTL, func(keys []uint) map[uint]*models.User {
 //			return db.ListByIDs(keys)
 //	})
-func MGetOrFind[K comdef.SimpleType, T any](keyPrefix string, keys []K, cacheTTL time.Duration, queryFn func(keys []K) map[K]T) []T {
-	return MGetCacheOrFind(std, keyPrefix, keys, cacheTTL, queryFn)
+func MGetOrElse[K comdef.SimpleType, T any](
+	keyPrefix string,
+	keys []K,
+	cacheTTL time.Duration,
+	queryFn func(keys []K) (map[K]T, error),
+) ([]T, error) {
+	return MGetElseUse(std, keyPrefix, keys, cacheTTL, queryFn)
 }
 
 // Keys get the keys of the default cache
@@ -116,10 +121,16 @@ func TypedInCache[T any](c *Cache, key string) (T, bool) {
 	return res, true
 }
 
-// MGetCacheOrFind 根据key prefix + keys(eg: ids) 批量获取缓存值，不存在则调用回调函数获取(DB)数据
-func MGetCacheOrFind[K comdef.SimpleType, T any](c *Cache, prefix string, keys []K, cacheTTL time.Duration, queryFn func(keys []K) map[K]T) []T {
+// MGetElseUse 根据key prefix + keys(eg: ids) 批量获取缓存值，不存在则调用回调函数获取(DB)数据
+func MGetElseUse[K comdef.SimpleType, T any](
+	c *Cache,
+	prefix string,
+	keys []K,
+	cacheTTL time.Duration,
+	queryFn func(keys []K) (map[K]T, error),
+) ([]T, error) {
 	if len(keys) == 0 {
-		return make([]T, 0)
+		return make([]T, 0), nil
 	}
 
 	// 构建完整的缓存键list
@@ -158,11 +169,14 @@ func MGetCacheOrFind[K comdef.SimpleType, T any](c *Cache, prefix string, keys [
 		}
 	}
 	if len(missKeys) == 0 {
-		return dataList
+		return dataList, nil
 	}
 
 	// 调用回调函数获取缺失的缓存值
-	missDataMap := queryFn(missKeys)
+	missDataMap, err := queryFn(missKeys)
+	if err != nil {
+		return nil, err
+	}
 	netSetMap := make(map[string]any, len(missKeys))
 
 	// 合并结果
@@ -178,7 +192,7 @@ func MGetCacheOrFind[K comdef.SimpleType, T any](c *Cache, prefix string, keys [
 	}
 
 	c.MSet(netSetMap, cacheTTL)
-	return dataList
+	return dataList, nil
 }
 
 //
