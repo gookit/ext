@@ -57,7 +57,7 @@ func MGet(keys ...string) map[string]any { return std.MGet(keys...) }
 func MSet(items map[string]any, ttl time.Duration) { std.MSet(items, ttl) }
 
 // CacheNotExist 表示缓存不存在的特殊值，避免缓存穿透
-var CacheNotExist = "_cache_not_exist_"
+var CacheNotExist = "0_cache_not_exist_0"
 
 // MGetOrElse 根据key prefix + keys(eg: ids) 批量获取缓存值，不存在则调用回调函数获取(eg: DB)数据
 //
