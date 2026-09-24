@@ -40,7 +40,7 @@ decode := func(text string) (map[string]any, error) {
 // rendered 是把当前配置整体序列化后的文本
 err := tomlkit.MergeFile("app.toml", rendered, tomlkit.Options{
     Decode:   decode,
-    Defaults: pristineData, // 可选：默认配置的数据
+    Defaults: pristineText, // 可选：默认配置序列化后的文本
 })
 if err != nil {
     log.Fatal(err)
@@ -58,7 +58,7 @@ merged, err := tomlkit.Merge(oldText, renderedText, tomlkit.Options{Decode: deco
 1. 表级：解码后内容相同的表整块保留原文，注释与格式都在。
 2. 键级：表发生变化时逐键处理——未变的键保留原行，变更的键保留其前置注释与行内注释、只替换值，新增的键使用渲染结果。
 3. 删除：渲染结果中不存在的表会被整体移除。
-4. 默认抑制：文件里本来没有、且内容与 `Defaults` 一致的表不会写入。
+4. 默认抑制：文件里本来没有、且内容与 `Defaults` 一致的表不会写入（`Defaults` 请传**同一序列化器**产出的默认配置文本，两边会走同一个 `Decode` 比较）。
 5. 降级：无法逐行分析的块（跨行数组、内联表、子表）该表整体使用渲染结果。
 
 ## 安全网

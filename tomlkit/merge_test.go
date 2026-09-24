@@ -91,12 +91,12 @@ repo = "sharkdp/fd"
   enable = false
 `
 
-func options(defaults map[string]any) Options {
+func options(defaults string) Options {
 	return Options{Decode: testDecode, Defaults: defaults}
 }
 
 func TestMergeKeepsCommentsAndUntouchedTables(t *testing.T) {
-	merged, err := Merge(mergeFixture, renderedFixture, options(nil))
+	merged, err := Merge(mergeFixture, renderedFixture, options(""))
 	assert.NoErr(t, err)
 
 	// File-level comments survive.
@@ -120,7 +120,7 @@ repo = "sharkdp/bat"
 [cache_mirror]
   enable = false
 `
-	merged, err := Merge(mergeFixture, rendered, options(nil))
+	merged, err := Merge(mergeFixture, rendered, options(""))
 	assert.NoErr(t, err)
 
 	if strings.Contains(merged, "[packages.fd]") {
@@ -148,8 +148,7 @@ func TestMergeSkipsDefaultAndHeaderOnlyTables(t *testing.T) {
 [api_cache]
   enable = true
 `
-	defaults, err := testDecode("[api_cache]\nenable = true\n")
-	assert.NoErr(t, err)
+	defaults := "[api_cache]\nenable = true\n"
 
 	merged, err := Merge(mergeFixture, rendered, options(defaults))
 	assert.NoErr(t, err)
@@ -198,13 +197,13 @@ func TestMergeFileWritesAndFallsBack(t *testing.T) {
 	dir := t.TempDir()
 
 	missing := filepath.Join(dir, "nested", "app.toml")
-	assert.NoErr(t, MergeFile(missing, renderedFixture, options(nil)))
+	assert.NoErr(t, MergeFile(missing, renderedFixture, options("")))
 	assert.StrContains(t, readString(t, missing), "[global]")
 
 	// A document that cannot be decoded at all is replaced instead of merged.
 	broken := filepath.Join(dir, "broken.toml")
 	assert.NoErr(t, os.WriteFile(broken, []byte("this is not a toml document\n"), 0o644))
-	assert.NoErr(t, MergeFile(broken, renderedFixture, options(nil)))
+	assert.NoErr(t, MergeFile(broken, renderedFixture, options("")))
 	assert.Eq(t, renderedFixture, readString(t, broken))
 }
 

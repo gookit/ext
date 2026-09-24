@@ -28,10 +28,11 @@ type Decode func(text string) (map[string]any, error)
 type Options struct {
 	// Decode parses both the old and the rendered document. Required.
 	Decode Decode
-	// Defaults holds the data of a pristine document. A table that is missing
-	// from the file but equal to its Defaults entry consists of defaults only and
-	// is not written into that file.
-	Defaults map[string]any
+	// Defaults is a pristine document rendered by the same serializer as
+	// renderedText. A table that is missing from the file but equal to its
+	// Defaults entry consists of defaults only and is not written into that file.
+	// Comparing it through the same Decode keeps both sides in the same shape.
+	Defaults string
 	// CommentPrefixes lists the characters that start a line comment. Empty means
 	// "#" (TOML); use "#;" for INI files.
 	CommentPrefixes string
@@ -71,6 +72,14 @@ func Merge(oldText, renderedText string, opts Options) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	// The defaults go through the same decoder, so "equal to the defaults" is a
+	// meaningful comparison rather than a shape mismatch.
+	var defaultData map[string]any
+	if opts.Defaults != "" {
+		if defaultData, err = opts.Decode(opts.Defaults); err != nil {
+			return "", err
+		}
+	}
 
 	prefixes := opts.commentPrefixes()
 	renderedBlocks := splitBlocks(renderedText, prefixes)
@@ -109,7 +118,7 @@ func Merge(oldText, renderedText string, opts Options) (string, error) {
 		if !hasKeyLines(item.text, prefixes) {
 			continue
 		}
-		if reflect.DeepEqual(lookupPath(opts.Defaults, item.name), lookupPath(newData, item.name)) {
+		if reflect.DeepEqual(lookupPath(defaultData, item.name), lookupPath(newData, item.name)) {
 			continue
 		}
 		out.WriteString(item.text)

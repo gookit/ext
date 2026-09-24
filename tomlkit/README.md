@@ -46,7 +46,7 @@ decode := func(text string) (map[string]any, error) {
 // rendered is the whole document produced by your serializer
 err := tomlkit.MergeFile("app.toml", rendered, tomlkit.Options{
     Decode:   decode,
-    Defaults: pristineData, // optional: data of a pristine config
+    Defaults: pristineText, // optional: a pristine config, same serializer
 })
 if err != nil {
     log.Fatal(err)
@@ -67,7 +67,8 @@ merged, err := tomlkit.Merge(oldText, renderedText, tomlkit.Options{Decode: deco
    keys come from the rendered document.
 3. Removal: tables missing from the rendered document are dropped whole.
 4. Defaults: a table that is absent from the file and matches `Defaults` is not
-   written.
+   written (`Defaults` is the pristine document from the same serializer; both
+   sides go through the same `Decode`, so the comparison is shape-consistent).
 5. Fallback: a block that cannot be analysed line by line (multi-line arrays,
    inline tables, sub-tables) is taken from the rendered document as-is.
 
