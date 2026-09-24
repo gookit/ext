@@ -69,8 +69,18 @@ merged, err := tomlkit.Merge(oldText, renderedText, tomlkit.Options{Decode: deco
 4. Defaults: a table that is absent from the file and matches `Defaults` is not
    written (`Defaults` is the pristine document from the same serializer; both
    sides go through the same `Decode`, so the comparison is shape-consistent).
-5. Fallback: a block that cannot be analysed line by line (multi-line arrays,
-   inline tables, sub-tables) is taken from the rendered document as-is.
+5. Multi-line values: `key = [` … `]` counts as one key — kept as-is when it did
+   not change, and replaced (with the comments above it) when it did.
+6. Header block: top-level keys such as `paths = [...]` are compared and updated
+   like a table, while the comments around them are kept.
+7. Fallback: a block that cannot be analysed line by line (sub-tables, inline
+   tables) is taken from the rendered document as-is.
+
+## Keeping unknown tables
+
+With `Options.KeepExtraTables` set, tables that exist in the file but not in the
+rendered document are kept as they are. That suits config files a user edits by
+hand (a project `.xenv.toml`, say). By default those tables are dropped.
 
 ## Safety nets
 

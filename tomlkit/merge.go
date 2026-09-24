@@ -36,6 +36,10 @@ type Options struct {
 	// CommentPrefixes lists the characters that start a line comment. Empty means
 	// "#" (TOML); use "#;" for INI files.
 	CommentPrefixes string
+	// KeepExtraTables keeps tables that exist in the file but not in the rendered
+	// document, instead of dropping them. Use it when the file may hold user
+	// content the serializer does not know about.
+	KeepExtraTables bool
 }
 
 func (o Options) commentPrefixes() string {
@@ -94,15 +98,15 @@ func Merge(oldText, renderedText string, opts Options) (string, error) {
 		next, exists := renderedByName[item.name]
 		if !exists {
 			// The table left the document. The header block (keys and comments
-			// before the first [table]) has no counterpart in a rendered
-			// document, so it is always kept.
-			if item.name == "" {
+			// before the first [table]) has no counterpart in a rendered document,
+			// so it is always kept; an unknown table is kept on request.
+			if item.name == "" || opts.KeepExtraTables {
 				out.WriteString(item.text)
 			}
 			continue
 		}
 		kept[item.name] = true
-		if reflect.DeepEqual(lookupPath(oldData, item.name), lookupPath(newData, item.name)) {
+		if reflect.DeepEqual(tableData(oldData, item.name), tableData(newData, item.name)) {
 			out.WriteString(item.text)
 			continue
 		}
@@ -118,7 +122,7 @@ func Merge(oldText, renderedText string, opts Options) (string, error) {
 		if !hasKeyLines(item.text, prefixes) {
 			continue
 		}
-		if reflect.DeepEqual(lookupPath(defaultData, item.name), lookupPath(newData, item.name)) {
+		if reflect.DeepEqual(tableData(defaultData, item.name), tableData(newData, item.name)) {
 			continue
 		}
 		out.WriteString(item.text)
@@ -167,7 +171,7 @@ func mergeTable(oldText, newText, prefixes string) string {
 		line := newTable.keys[key]
 		old, existed := oldTable.keys[key]
 		switch {
-		case existed && simpleKeyValue(old.line, prefixes) == simpleKeyValue(line.line, prefixes):
+		case existed && keyValue(old.line, prefixes) == keyValue(line.line, prefixes):
 			// Untouched key: original text, comment and all.
 			out.WriteString(old.leading)
 			out.WriteString(old.line)
@@ -212,36 +216,48 @@ type table struct {
 }
 
 // parseKeyLines splits a table into its header line and one entry per
-// "key = value" line. It reports false when a line cannot be handled that way
-// (a value continued on the next line, a sub-table), because the caller must
-// then avoid merging.
+// "key = value" pair, keeping a value that continues on the following lines (a
+// multi-line array, for instance) with its key. It reports false when a line
+// cannot be handled that way, because the caller must then avoid merging.
 func parseKeyLines(text, prefixes string) (table, bool) {
 	parsed := table{keys: map[string]keyLine{}}
 	var leading strings.Builder
 	headerSeen := false
+	lines := strings.SplitAfter(text, "\n")
 
-	for _, raw := range strings.SplitAfter(text, "\n") {
+	for index := 0; index < len(lines); index++ {
+		raw := lines[index]
 		trimmed := strings.TrimSpace(raw)
 		switch {
 		case !headerSeen && strings.HasPrefix(trimmed, "["):
 			parsed.header += raw
 			headerSeen = true
+			continue
 		case trimmed == "" || isComment(trimmed, prefixes):
 			leading.WriteString(raw)
-		default:
-			key, ok := simpleKeyName(trimmed, prefixes)
-			if !ok {
+			continue
+		}
+
+		key, ok := simpleKeyName(trimmed)
+		if !ok {
+			return table{}, false
+		}
+		block := raw
+		for unbalancedValue(keyValue(block, prefixes)) {
+			if index+1 >= len(lines) {
 				return table{}, false
 			}
-			parsed.order = append(parsed.order, key)
-			parsed.keys[key] = keyLine{leading: leading.String(), line: raw}
-			leading.Reset()
+			index++
+			block += lines[index]
 		}
+		parsed.order = append(parsed.order, key)
+		parsed.keys[key] = keyLine{leading: leading.String(), line: block}
+		leading.Reset()
 	}
 	return parsed, true
 }
 
-func simpleKeyName(line, prefixes string) (string, bool) {
+func simpleKeyName(line string) (string, bool) {
 	index := strings.Index(line, "=")
 	if index <= 0 {
 		return "", false
@@ -250,26 +266,18 @@ func simpleKeyName(line, prefixes string) (string, bool) {
 	if key == "" || strings.ContainsAny(key, " \t\"'") {
 		return "", false
 	}
-	value := strings.TrimSpace(line[index+1:])
-	if comment, ok := inlineComment(value, prefixes); ok {
-		value = strings.TrimSpace(strings.TrimSuffix(value, comment))
-	}
-	if unbalancedValue(value) {
-		return "", false
-	}
 	return key, true
 }
 
-// simpleKeyValue returns the value of a "key = value" line without indentation
-// or a trailing comment, so purely cosmetic differences (a serializer indents,
-// a hand-written file may not) do not read as a change.
-func simpleKeyValue(line, prefixes string) string {
-	trimmed := strings.TrimSpace(line)
-	index := strings.Index(trimmed, "=")
+// keyValue returns everything after the first "=" of a key block with a trailing
+// comment removed, so callers can compare values or see whether a value is
+// finished.
+func keyValue(block, prefixes string) string {
+	index := strings.Index(block, "=")
 	if index <= 0 {
-		return trimmed
+		return strings.TrimSpace(block)
 	}
-	value := strings.TrimSpace(trimmed[index+1:])
+	value := strings.TrimSpace(block[index+1:])
 	if comment, ok := inlineComment(value, prefixes); ok {
 		value = strings.TrimSpace(strings.TrimSuffix(value, comment))
 	}
@@ -386,6 +394,23 @@ func hasKeyLines(text, prefixes string) bool {
 		return true
 	}
 	return false
+}
+
+// tableData returns the data a block covers: for a table path that is simply the
+// table, for the header block (empty path) the top-level keys, since sub-tables
+// are blocks of their own.
+func tableData(data map[string]any, path string) any {
+	if path != "" {
+		return lookupPath(data, path)
+	}
+	scalars := map[string]any{}
+	for key, value := range data {
+		if _, isTable := value.(map[string]any); isTable {
+			continue
+		}
+		scalars[key] = value
+	}
+	return scalars
 }
 
 // lookupPath walks a dotted table path ("packages.fd") through decoded data.

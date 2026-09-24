@@ -12,13 +12,15 @@ import (
 )
 
 // testDecode is a tiny TOML/INI reader for the fixtures below: sections, simple
-// "key = value" lines and "#"/";" comments. Keeping it local is the point of
-// injecting Decode — the package itself needs no parser dependency.
+// "key = value" lines (values may span lines) and "#"/";" comments. Keeping it
+// local is the point of injecting Decode — the package itself needs no parser.
 func testDecode(text string) (map[string]any, error) {
 	root := map[string]any{}
 	current := root
-	for _, raw := range strings.Split(text, "\n") {
-		line := strings.TrimSpace(strings.TrimSuffix(raw, "\r"))
+	lines := strings.Split(text, "\n")
+
+	for index := 0; index < len(lines); index++ {
+		line := strings.TrimSpace(strings.TrimSuffix(lines[index], "\r"))
 		if line == "" || strings.HasPrefix(line, "#") || strings.HasPrefix(line, ";") {
 			continue
 		}
@@ -35,12 +37,22 @@ func testDecode(text string) (map[string]any, error) {
 			}
 			continue
 		}
-		index := strings.Index(line, "=")
-		if index <= 0 {
+
+		// Values may continue on the following lines: "paths = [" ... "]".
+		block := line
+		for unbalancedValue(keyValue(block, "#")) {
+			index++
+			if index >= len(lines) {
+				return nil, fmt.Errorf("unterminated value %q", block)
+			}
+			block += strings.TrimSpace(lines[index])
+		}
+
+		equal := strings.Index(block, "=")
+		if equal <= 0 {
 			return nil, fmt.Errorf("bad line %q", line)
 		}
-		key := strings.TrimSpace(line[:index])
-		current[key] = testValue(strings.TrimSpace(line[index+1:]))
+		current[strings.TrimSpace(block[:equal])] = testValue(strings.TrimSpace(block[equal+1:]))
 	}
 	return root, nil
 }
@@ -61,7 +73,23 @@ func testValue(value string) any {
 	if number, err := strconv.Atoi(value); err == nil {
 		return number
 	}
+	if strings.HasPrefix(value, "[") {
+		return normalizeList(value)
+	}
 	return value
+}
+
+// normalizeList compares arrays by their items, ignoring spacing and a trailing
+// comma, so a re-formatted array does not read as a change in these tests.
+func normalizeList(value string) string {
+	inner := strings.TrimSuffix(strings.TrimPrefix(value, "["), "]")
+	items := []string{}
+	for _, item := range strings.Split(inner, ",") {
+		if item = strings.TrimSpace(item); item != "" {
+			items = append(items, item)
+		}
+	}
+	return "[" + strings.Join(items, ",") + "]"
 }
 
 const mergeFixture = `# my config
@@ -158,20 +186,46 @@ func TestMergeSkipsDefaultAndHeaderOnlyTables(t *testing.T) {
 	assert.StrContains(t, merged, "[global]")
 }
 
-func TestMergeKeepsUnmergeableTableRendered(t *testing.T) {
-	// A table this package cannot split line by line (a value continued on the
-	// next line) is taken from the rendered document as a whole.
-	old := "[global]\nfallbacks = [\"a\",\n  \"b\"]\n"
-	rendered := "[global]\n  fallbacks = [\"c\"]\n"
-	// The decoder only needs to report that something changed; the block shape is
-	// what this test is about.
-	lenient := func(text string) (map[string]any, error) {
-		return map[string]any{"global": map[string]any{"raw": text}}, nil
-	}
+func TestMergeHandlesMultiLineValues(t *testing.T) {
+	// A value that spans lines (a multi-line array) is handled as one key, so its
+	// own comment and layout survive while a sibling key changes.
+	old := "# head\npaths = [\n  \"./bin\",\n  \"./tools\",\n]\n\n[envs]\nFOO = \"1\"\n"
+	rendered := "# head\npaths = [\"./bin\", \"./tools\"]\n\n[envs]\n  FOO = \"2\"\n"
 
-	merged, err := Merge(old, rendered, Options{Decode: lenient})
+	merged, err := Merge(old, rendered, options(""))
 	assert.NoErr(t, err)
-	assert.Eq(t, rendered, merged)
+
+	assert.StrContains(t, merged, "paths = [\n  \"./bin\",\n  \"./tools\",\n]")
+	assert.StrContains(t, merged, `FOO = "2"`)
+}
+
+func TestMergeUpdatesTopLevelKeys(t *testing.T) {
+	// The header block is a real block: its top-level keys must follow the
+	// rendered document, unlike its comments.
+	old := "# head\npaths = [\"./bin\"]\n\n[envs]\nFOO = \"1\"\n"
+	rendered := "# head\npaths = [\"./bin\", \"./extra\"]\n\n[envs]\n  FOO = \"1\"\n"
+
+	merged, err := Merge(old, rendered, options(""))
+	assert.NoErr(t, err)
+
+	assert.StrContains(t, merged, `paths = ["./bin", "./extra"]`)
+	assert.StrContains(t, merged, "# head")
+	assert.StrContains(t, merged, "\nFOO = \"1\"\n")
+}
+
+func TestMergeKeepsExtraTablesOnRequest(t *testing.T) {
+	old := "[envs]\nFOO = \"1\"\n\n[user_notes]\n# mine\nkeep = true\n"
+	rendered := "[envs]\n  FOO = \"1\"\n"
+
+	// Without the option the unknown table disappears...
+	dropped, err := Merge(old, rendered, options(""))
+	assert.NoErr(t, err)
+	assert.False(t, strings.Contains(dropped, "[user_notes]"))
+
+	// ...and with it the file keeps what the serializer does not know about.
+	kept, err := Merge(old, rendered, Options{Decode: testDecode, KeepExtraTables: true})
+	assert.NoErr(t, err)
+	assert.StrContains(t, kept, "[user_notes]\n# mine\nkeep = true\n")
 }
 
 func TestMergeRequiresDecode(t *testing.T) {
