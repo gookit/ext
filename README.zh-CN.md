@@ -21,6 +21,13 @@ go get github.com/gookit/goutil/ext
 > [!NOTE]
 > 更多信息请查看: [./lcache](./lcache/README.md)
 
+## Package: tomlkit
+
+带注释保留的 TOML/INI 文档合并：把重新序列化后的完整文档与磁盘上的原文件合并，未变更的部分保留原文（注释、键顺序、格式），只应用真正的改动。
+
+> [!NOTE]
+> 更多信息请查看: [./tomlkit](./tomlkit/README.zh-CN.md)
+
 ## License
 
 MIT

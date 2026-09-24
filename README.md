@@ -21,6 +21,14 @@ go get github.com/gookit/goutil/ext
 > [!NOTE]
 > More information please see: [./lcache](./lcache/README.md)
 
+## Package: tomlkit
+
+Comment-preserving TOML/INI merging: combine a freshly serialized document with
+the file on disk, keeping untouched comments, key order and formatting.
+
+> [!NOTE]
+> More information please see: [./tomlkit](./tomlkit/README.md)
+
 
 ## License
 
