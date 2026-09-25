@@ -186,6 +186,13 @@ func mergeTable(oldText, newText, prefixes string) string {
 			out.WriteString(line.line)
 		}
 	}
+	// Keep the spacing the file had after the last key (a serializer writes its
+	// own, which may not match the file's layout).
+	if oldTable.trailing != "" {
+		out.WriteString(oldTable.trailing)
+	} else {
+		out.WriteString(newTable.trailing)
+	}
 	return out.String()
 }
 
@@ -211,8 +218,11 @@ type keyLine struct {
 
 type table struct {
 	header string
-	order  []string
-	keys   map[string]keyLine
+	// trailing holds the blank lines and comments that follow the last key, so a
+	// re-written table keeps the spacing before the next one.
+	trailing string
+	order    []string
+	keys     map[string]keyLine
 }
 
 // parseKeyLines splits a table into its header line and one entry per
@@ -254,6 +264,7 @@ func parseKeyLines(text, prefixes string) (table, bool) {
 		parsed.keys[key] = keyLine{leading: leading.String(), line: block}
 		leading.Reset()
 	}
+	parsed.trailing = leading.String()
 	return parsed, true
 }
 

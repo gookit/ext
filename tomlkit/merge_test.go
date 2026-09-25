@@ -213,6 +213,15 @@ func TestMergeUpdatesTopLevelKeys(t *testing.T) {
 	assert.StrContains(t, merged, "\nFOO = \"1\"\n")
 }
 
+func TestMergeKeepsBlankLinesAroundChangedTables(t *testing.T) {
+	old := "paths = [\"./bin\"]\n\n[sdks]\ngo = \"1.22\"\n\n[envs]\nFOO = \"1\"\n\n[user]\nnote = \"x\"\n"
+	rendered := "paths = [\"./bin\", \"./extra\"]\n\n[sdks]\n  go = \"1.23\"\n\n[envs]\n  FOO = \"1\"\n\n[user]\n  note = \"x\"\n"
+
+	merged, err := Merge(old, rendered, Options{Decode: testDecode, KeepExtraTables: true})
+	assert.NoErr(t, err)
+	assert.Eq(t, "paths = [\"./bin\", \"./extra\"]\n\n[sdks]\n  go = \"1.23\"\n\n[envs]\nFOO = \"1\"\n\n[user]\nnote = \"x\"\n", merged)
+}
+
 func TestMergeKeepsExtraTablesOnRequest(t *testing.T) {
 	old := "[envs]\nFOO = \"1\"\n\n[user_notes]\n# mine\nkeep = true\n"
 	rendered := "[envs]\n  FOO = \"1\"\n"
