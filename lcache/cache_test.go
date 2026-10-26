@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/gookit/ext/lcache"
-	"github.com/gookit/goutil/testutil/assert"
+	"github.com/gookit/goutil/x/assert"
 )
 
 func TestCache_SetAndGet(t *testing.T) {
