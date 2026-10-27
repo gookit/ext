@@ -34,6 +34,12 @@ func TestPIDFileRoundTrip(t *testing.T) {
 	assert.True(t, os.IsNotExist(err))
 }
 
+func TestReadPIDFileMissing(t *testing.T) {
+	if _, err := ReadPIDFile(filepath.Join(t.TempDir(), "nope.pid")); err == nil {
+		t.Fatal("expected error reading a missing pidfile")
+	}
+}
+
 func TestReadPIDFileInvalid(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "bad.pid")
 	assert.NoErr(t, os.WriteFile(path, []byte("not-a-number"), 0o644))
@@ -81,7 +87,22 @@ func TestTakeoverRepointsPidfile(t *testing.T) {
 	assert.True(t, os.IsNotExist(err))
 }
 
-// TestSpawnDetachedRoundTrip drives the whole detach contract end to end: Spawn
+func TestTerminateDeliversToSelf(t *testing.T) {
+	ch := make(chan os.Signal, 1)
+	signal.Notify(ch, syscall.SIGTERM)
+	defer signal.Stop(ch)
+	NotifyStop(ch)
+
+	if err := Terminate(os.Getpid()); err != nil {
+		t.Fatalf("Terminate(self): %v", err)
+	}
+	select {
+	case <-ch:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Terminate(self) delivered nothing to NotifyStop")
+	}
+}
+
 // re-execs this test binary as the helper child, records its readiness in the
 // sidecar log, then stops it through Terminate.
 func TestSpawnDetachedRoundTrip(t *testing.T) {
@@ -108,7 +129,7 @@ func TestSpawnDetachedRoundTrip(t *testing.T) {
 // TestHelperDaemonChild is the detached child of TestSpawnDetachedRoundTrip.
 func TestHelperDaemonChild(t *testing.T) {
 	if !Daemonized() {
-		return
+		t.Skip("helper for TestSpawnDetachedRoundTrip; runs only in the detached child")
 	}
 	_, _ = os.Stdout.WriteString("child-ready\n")
 	sig := make(chan os.Signal, 1)
