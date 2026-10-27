@@ -21,6 +21,20 @@ go get github.com/gookit/goutil/ext
 > [!NOTE]
 > 更多信息请查看: [./lcache](./lcache/README.md)
 
+## Package: daemon
+
+`daemon` 提供跨平台后台进程启动、优雅停止信号、PID 文件所有权和陈旧进程保护。
+
+> [!NOTE]
+> 更多信息请查看: [./daemon](./daemon)
+
+## Package: procattr
+
+`procattr` 为 Windows 上的非交互子进程配置隐藏控制台窗口，在其他平台上为空操作。
+
+> [!NOTE]
+> 更多信息请查看: [./procattr](./procattr)
+
 ## Package: tomlkit
 
 带注释保留的 TOML/INI 文档合并：把重新序列化后的完整文档与磁盘上的原文件合并，未变更的部分保留原文（注释、键顺序、格式），只应用真正的改动。
