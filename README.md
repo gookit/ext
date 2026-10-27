@@ -30,6 +30,13 @@ the file on disk, keeping untouched comments, key order and formatting.
 > More information please see: [./tomlkit](./tomlkit/README.md)
 
 
+## Package: localauth
+
+`localauth` provides local bearer-token authentication, token-file storage, and Host/Origin checks for HTTP services.
+
+> [!NOTE]
+> More information please see: [./localauth](./localauth/README.md)
+
 ## License
 
 MIT
