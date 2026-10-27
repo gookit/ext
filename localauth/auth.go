@@ -99,6 +99,22 @@ func WriteToken(path, token string) error {
 	if err := file.Sync(); err != nil {
 		return fmt.Errorf("localauth: sync token file: %w", err)
 	}
+	if err := verifyTokenFile(path); err != nil {
+		return err
+	}
+	return nil
+}
+
+func verifyTokenFile(path string) error {
+	info, err := os.Stat(path)
+	if err != nil {
+		return fmt.Errorf("localauth: verify token file: %w", err)
+	}
+	// Windows ACLs are not represented by Unix mode bits. The documented
+	// contract there is the user's profile ACL rather than this mode check.
+	if os.PathSeparator != '\\' && info.Mode().Perm() != 0o600 {
+		return fmt.Errorf("localauth: token file %q has permissions %o, want 600", path, info.Mode().Perm())
+	}
 	return nil
 }
 
