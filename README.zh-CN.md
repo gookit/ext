@@ -21,12 +21,40 @@ go get github.com/gookit/goutil/ext
 > [!NOTE]
 > 更多信息请查看: [./lcache](./lcache/README.md)
 
+## Package: daemon
+
+`daemon` 提供跨平台后台进程启动、优雅停止信号、PID 文件所有权和陈旧进程保护。
+
+> [!NOTE]
+> 更多信息请查看: [./daemon](./daemon)
+
+## Package: procattr
+
+`procattr` 为 Windows 上的非交互子进程配置隐藏控制台窗口，在其他平台上为空操作。
+
+> [!NOTE]
+> 更多信息请查看: [./procattr](./procattr)
+
+## Package: desknotify
+
+`desknotify` 使用平台原生辅助程序发送尽力而为的桌面通知；桌面不可用时安全降级。
+
+> [!NOTE]
+> 更多信息请查看: [./desknotify](./desknotify)
+
 ## Package: tomlkit
 
 带注释保留的 TOML/INI 文档合并：把重新序列化后的完整文档与磁盘上的原文件合并，未变更的部分保留原文（注释、键顺序、格式），只应用真正的改动。
 
 > [!NOTE]
 > 更多信息请查看: [./tomlkit](./tomlkit/README.zh-CN.md)
+
+## Package: localauth
+
+`localauth` 提供本机 HTTP 服务使用的 Bearer token 认证、token 文件存储以及 Host/Origin 校验。
+
+> [!NOTE]
+> 更多信息请查看: [./localauth](./localauth/README.zh-CN.md)
 
 ## Package: imbot
 
