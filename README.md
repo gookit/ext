@@ -37,6 +37,13 @@ window on Windows; it is a no-op on other platforms.
 > [!NOTE]
 > More information please see [./procattr](./procattr).
 
+## Package: desknotify
+
+`desknotify` sends best-effort desktop notifications using the platform's native helper and degrades cleanly when no desktop is available.
+
+> [!NOTE]
+> More information please see [./desknotify](./desknotify).
+
 ## Package: tomlkit
 
 Comment-preserving TOML/INI merging: combine a freshly serialized document with
