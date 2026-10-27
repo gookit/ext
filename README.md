@@ -60,6 +60,15 @@ the file on disk, keeping untouched comments, key order and formatting.
 > [!NOTE]
 > More information please see: [./localauth](./localauth/README.md)
 
+## Package: imbot
+
+One-way notifications for generic webhooks, DingTalk and Feishu, with allowlisted
+public targets, provider signatures, bounded timeout, one retry, and business-error
+classification.
+
+> [!NOTE]
+> More information please see: [./imbot](./imbot/README.md)
+
 ## License
 
 MIT
