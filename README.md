@@ -21,6 +21,22 @@ go get github.com/gookit/goutil/ext
 > [!NOTE]
 > More information please see: [./lcache](./lcache/README.md)
 
+## Package: daemon
+
+`daemon` provides cross-platform detached process startup, graceful stop signaling,
+pid-file ownership and stale-process protection for local daemons.
+
+> [!NOTE]
+> More information please see [./daemon](./daemon).
+
+## Package: procattr
+
+`procattr` configures non-interactive child processes to avoid opening a console
+window on Windows; it is a no-op on other platforms.
+
+> [!NOTE]
+> More information please see [./procattr](./procattr).
+
 ## Package: tomlkit
 
 Comment-preserving TOML/INI merging: combine a freshly serialized document with
