@@ -28,6 +28,13 @@ go get github.com/gookit/goutil/ext
 > [!NOTE]
 > 更多信息请查看: [./tomlkit](./tomlkit/README.zh-CN.md)
 
+## Package: localauth
+
+`localauth` 提供本机 HTTP 服务使用的 Bearer token 认证、token 文件存储以及 Host/Origin 校验。
+
+> [!NOTE]
+> 更多信息请查看: [./localauth](./localauth/README.zh-CN.md)
+
 ## License
 
 MIT
