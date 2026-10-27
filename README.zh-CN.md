@@ -28,6 +28,14 @@ go get github.com/gookit/goutil/ext
 > [!NOTE]
 > 更多信息请查看: [./tomlkit](./tomlkit/README.zh-CN.md)
 
+## Package: imbot
+
+单向通知：支持通用 webhook、钉钉和飞书，并提供目标白名单、SSRF 防护、provider
+签名、超时、一次重试和业务错误分类。
+
+> [!NOTE]
+> 更多信息请查看: [./imbot](./imbot/README.zh-CN.md)
+
 ## License
 
 MIT
