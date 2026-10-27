@@ -61,13 +61,13 @@ func reloadEventName(pid int) string { return fmt.Sprintf("%s%d", reloadEventPre
 
 // reexecDetached starts a copy of the current binary detached from our console,
 // with stdin closed and stdout/stderr appended to the sidecar output file. The
-// EnvSentinel guard makes the child skip its own daemonization.
-func reexecDetached(logPath string) (*exec.Cmd, error) {
+// sentinel guard makes the child skip its own daemonization.
+func reexecDetached(logPath, sentinel string) (*exec.Cmd, error) {
 	self, err := os.Executable()
 	if err != nil {
 		return nil, err
 	}
-	return StartDetached(self, os.Args[1:], append(os.Environ(), EnvSentinel+"=1"), logPath)
+	return StartDetached(self, os.Args[1:], append(os.Environ(), sentinel+"=1"), logPath)
 }
 
 // StartDetached starts exe detached from our console (see the file comment), with

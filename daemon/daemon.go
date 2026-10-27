@@ -18,9 +18,13 @@ import (
 	"time"
 )
 
-// EnvSentinel marks that the current process is already the detached child, so
-// re-exec is not attempted again (would otherwise fork-bomb). The parent sets
-// it to "1" on the child's environment; Daemonized() reads it.
+// EnvSentinel is the default env sentinel that marks the current process as the
+// detached child, so re-exec is not attempted again (would otherwise fork-bomb).
+// The parent sets it to "1" on the child's environment; Daemonized() reads it.
+// Applications should set Options.SentinelEnv to their own name (and check it
+// with DaemonizedAs): the sentinel is inherited by every process the daemon
+// starts, and a shared name would make another daemonizing tool among those
+// descendants believe it is already detached.
 const EnvSentinel = "GOKIT_DAEMONIZED"
 
 // ErrAlreadyRunning is returned by Spawn when the pidfile points at a live
@@ -41,6 +45,17 @@ type Options struct {
 	// Ready, when set, is polled during Settle; returning true ends the wait early
 	// (the child is healthy). Without it the child just has to survive Settle.
 	Ready func() bool
+	// SentinelEnv is the env var set on the child to mark it as detached;
+	// empty means EnvSentinel. The child checks it with DaemonizedAs.
+	SentinelEnv string
+}
+
+// sentinel returns the env sentinel name of o.
+func (o Options) sentinel() string {
+	if o.SentinelEnv != "" {
+		return o.SentinelEnv
+	}
+	return EnvSentinel
 }
 
 // ExitedError is returned by Spawn when the child exited during the settle window,
@@ -74,7 +89,11 @@ type Session struct {
 // Daemonized reports whether the current process is the detached child (the
 // env sentinel is set). The command layer calls this to decide whether to
 // re-exec (parent) or run the real command (child).
-func Daemonized() bool { return os.Getenv(EnvSentinel) == "1" }
+func Daemonized() bool { return DaemonizedAs(EnvSentinel) }
+
+// DaemonizedAs reports whether the current process is the detached child
+// started with Options.SentinelEnv = env.
+func DaemonizedAs(env string) bool { return os.Getenv(env) == "1" }
 
 // Spawn re-execs the current binary as a detached background child and returns
 // its PID. It refuses to start when the pidfile already points at a live process
@@ -97,7 +116,7 @@ func Spawn(o Options) (int, error) {
 	if fi, err := os.Stat(o.LogPath); err == nil {
 		logStart = fi.Size()
 	}
-	cmd, err := reexecDetached(o.LogPath)
+	cmd, err := reexecDetached(o.LogPath, o.sentinel())
 	if err != nil {
 		return 0, err
 	}

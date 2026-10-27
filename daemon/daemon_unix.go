@@ -13,14 +13,14 @@ import (
 // reexecDetached starts a copy of the current binary fully detached from the
 // controlling terminal: a new session (Setsid) so it survives the parent's exit
 // and is not in the parent's process group, with stdin closed and stdout/stderr
-// redirected to the sidecar output file. The EnvSentinel guard makes the child
+// redirected to the sidecar output file. The sentinel guard makes the child
 // skip its own daemonization.
-func reexecDetached(logPath string) (*exec.Cmd, error) {
+func reexecDetached(logPath, sentinel string) (*exec.Cmd, error) {
 	self, err := os.Executable()
 	if err != nil {
 		return nil, err
 	}
-	return StartDetached(self, os.Args[1:], append(os.Environ(), EnvSentinel+"=1"), logPath)
+	return StartDetached(self, os.Args[1:], append(os.Environ(), sentinel+"=1"), logPath)
 }
 
 // StartDetached starts exe fully detached (new session) with stdin closed and

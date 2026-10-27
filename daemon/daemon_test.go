@@ -195,3 +195,15 @@ func TestPIDFileText(t *testing.T) {
 	assert.Eq(t, "123\n", string(data))
 	assert.Eq(t, strconv.Itoa(123)+"\n", string(data))
 }
+
+// TestDaemonizedAs checks that a custom sentinel is read on its own: a child
+// started by one application must not look detached to another one.
+func TestDaemonizedAs(t *testing.T) {
+	t.Setenv(EnvSentinel, "")
+	t.Setenv("APP_A_DAEMONIZED", "1")
+	assert.True(t, DaemonizedAs("APP_A_DAEMONIZED"))
+	assert.False(t, DaemonizedAs("APP_B_DAEMONIZED"))
+	assert.False(t, Daemonized())
+	assert.Eq(t, "APP_A_DAEMONIZED", Options{SentinelEnv: "APP_A_DAEMONIZED"}.sentinel())
+	assert.Eq(t, EnvSentinel, Options{}.sentinel())
+}
