@@ -63,8 +63,9 @@ the file on disk, keeping untouched comments, key order and formatting.
 ## Package: imbot
 
 One-way notifications for generic webhooks, DingTalk and Feishu, with allowlisted
-public targets, provider signatures, bounded timeout, one retry, and business-error
-classification.
+public targets, provider signatures, bounded timeout, one retry, business-error
+classification, and optional keyword-mode body support. Set `Options.Keyword` to append a
+configured keyword without duplicating it.
 
 > [!NOTE]
 > More information please see: [./imbot](./imbot/README.md)
