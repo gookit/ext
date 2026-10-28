@@ -223,6 +223,77 @@ func TestPostPayloadAndSignaturesWithHTTPTestServer(t *testing.T) {
 	}
 }
 
+func TestKeywordRendering(t *testing.T) {
+	message := Message{Title: "构建完成", Text: "全部测试通过"}
+	for _, kind := range []string{KindDingTalk, KindFeishu} {
+		t.Run(kind+" payload", func(t *testing.T) {
+			body, err := renderMessageWithLimit(kind, message, "安全", 128)
+			assert.NoErr(t, err)
+			assert.True(t, strings.Contains(string(body), "安全"))
+			assert.Eq(t, 1, strings.Count(string(body), "安全"))
+		})
+		t.Run(kind+" already present", func(t *testing.T) {
+			body, err := renderMessageWithLimit(kind, Message{Title: "构建完成", Text: "已有安全"}, "安全", 128)
+			assert.NoErr(t, err)
+			assert.Eq(t, 1, strings.Count(string(body), "安全"))
+		})
+		t.Run(kind+" existing keyword beyond limit", func(t *testing.T) {
+			body, err := renderMessageWithLimit(kind, Message{Title: "构建完成", Text: strings.Repeat("长", 100) + "安全"}, "安全", 8)
+			assert.NoErr(t, err)
+			assert.Eq(t, 1, strings.Count(string(body), "安全"))
+		})
+		t.Run(kind+" empty text", func(t *testing.T) {
+			body, err := renderMessageWithLimit(kind, Message{Title: "构建完成"}, "安全", 8)
+			assert.NoErr(t, err)
+			assert.Eq(t, 1, strings.Count(string(body), "安全"))
+		})
+		t.Run(kind+" no keyword", func(t *testing.T) {
+			emptyKeyword, err := renderMessageWithLimit(kind, message, "", 128)
+			assert.NoErr(t, err)
+			unchanged, err := RenderMessageWithLimit(kind, message, 128)
+			assert.NoErr(t, err)
+			assert.Eq(t, string(unchanged), string(emptyKeyword))
+		})
+		t.Run(kind+" byte ceiling", func(t *testing.T) {
+			body, err := renderMessageWithLimit(kind, Message{Title: "构建完成", Text: strings.Repeat("界", 20000)}, "安全", 50000)
+			assert.NoErr(t, err)
+			assert.True(t, len(body) <= DingTalkFeishuMaxBytes)
+			assert.Eq(t, 1, strings.Count(string(body), "安全"))
+		})
+		t.Run(kind+" survives truncation", func(t *testing.T) {
+			body, err := renderMessageWithLimit(kind, Message{Title: "构建完成", Text: strings.Repeat("长", 100)}, "安全", 8)
+			assert.NoErr(t, err)
+			assert.True(t, strings.Contains(string(body), "安全"))
+			assert.True(t, strings.Contains(string(body), truncationMarker))
+		})
+	}
+
+	generic, err := renderMessageWithLimit(KindGeneric, message, "安全", 128)
+	assert.NoErr(t, err)
+	var genericPayload map[string]any
+	assert.NoErr(t, json.Unmarshal(generic, &genericPayload))
+	assert.Eq(t, "全部测试通过\n安全", genericPayload["text"])
+	genericTitle, err := renderMessageWithLimit(KindGeneric, Message{Title: "安全标题", Text: "正文"}, "安全", 128)
+	assert.NoErr(t, err)
+	var genericTitlePayload map[string]any
+	assert.NoErr(t, json.Unmarshal(genericTitle, &genericTitlePayload))
+	assert.Eq(t, "正文\n安全", genericTitlePayload["text"])
+	assert.Eq(t, 2, strings.Count(string(genericTitle), "安全"))
+}
+
+func TestProviderSendAppendsKeyword(t *testing.T) {
+	var gotBody []byte
+	client := &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		gotBody, _ = io.ReadAll(r.Body)
+		return response(http.StatusOK, `{"errcode":0}`), nil
+	})}
+	provider, err := NewProvider(KindDingTalk, "https://203.0.113.10/hook", Options{
+		Keyword: "安全", AllowedHosts: []string{"203.0.113.10"}, Client: client,
+	})
+	assert.NoErr(t, err)
+	assert.NoErr(t, provider.Send(context.Background(), Message{Title: "title", Text: strings.Repeat("x", 100)}))
+	assert.True(t, strings.Contains(string(gotBody), "安全"))
+}
 func TestProviderSendTimeout(t *testing.T) {
 	client := &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
 		<-r.Context().Done()

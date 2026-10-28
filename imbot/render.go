@@ -20,19 +20,26 @@ const (
 
 // RenderMessage builds the provider payload. Provider-specific signatures are
 // applied by Send immediately before the request is made.
+// Keyword-mode configuration is applied by NewProvider when a message is sent.
 func RenderMessage(kind string, m Message) ([]byte, error) {
-	return RenderMessageWithLimit(kind, m, DefaultMaxTextRunes)
+	return renderMessageWithLimit(kind, m, "", DefaultMaxTextRunes)
 }
 
 func RenderMessageWithLimit(kind string, m Message, maxRunes int) ([]byte, error) {
+	return renderMessageWithLimit(kind, m, "", maxRunes)
+}
+
+func renderMessageWithLimit(kind string, m Message, keyword string, maxRunes int) ([]byte, error) {
 	if maxRunes <= 0 {
 		maxRunes = DefaultMaxTextRunes
 	}
-	switch NormalizeKind(kind) {
+	kind = NormalizeKind(kind)
+	m, keyword = withKeyword(m, keyword, kind != KindGeneric)
+	switch kind {
 	case KindDingTalk:
-		return renderDingTalk(m, maxRunes)
+		return renderDingTalk(m, maxRunes, keyword)
 	case KindFeishu:
-		return renderFeishu(m, maxRunes)
+		return renderFeishu(m, maxRunes, keyword)
 	default:
 		return renderGeneric(m)
 	}
@@ -49,8 +56,8 @@ func renderGeneric(m Message) ([]byte, error) {
 	return json.Marshal(out)
 }
 
-func renderDingTalk(m Message, maxRunes int) ([]byte, error) {
-	return fitProviderPayload(m, maxRunes, func(text string) ([]byte, error) {
+func renderDingTalk(m Message, maxRunes int, keyword string) ([]byte, error) {
+	return fitProviderPayload(m, maxRunes, keyword, func(text string) ([]byte, error) {
 		var body strings.Builder
 		body.WriteString("### ")
 		body.WriteString(m.Title)
@@ -70,8 +77,8 @@ func renderDingTalk(m Message, maxRunes int) ([]byte, error) {
 	})
 }
 
-func renderFeishu(m Message, maxRunes int) ([]byte, error) {
-	return fitProviderPayload(m, maxRunes, func(text string) ([]byte, error) {
+func renderFeishu(m Message, maxRunes int, keyword string) ([]byte, error) {
+	return fitProviderPayload(m, maxRunes, keyword, func(text string) ([]byte, error) {
 		var body strings.Builder
 		body.WriteString(m.Title)
 		if text != "" {
@@ -89,9 +96,34 @@ func renderFeishu(m Message, maxRunes int) ([]byte, error) {
 	})
 }
 
-func fitProviderPayload(m Message, maxRunes int, build func(string) ([]byte, error)) ([]byte, error) {
+// withKeyword appends a missing keyword to the text; the renderer keeps it
+// outside the truncatable rune budget for keyword-mode bots.
+func withKeyword(m Message, keyword string, includeTitle bool) (Message, string) {
+	keyword = strings.TrimSpace(keyword)
+	if keyword == "" || (includeTitle && strings.Contains(m.Title, keyword)) {
+		return m, ""
+	}
+	if strings.Contains(m.Text, keyword) {
+		return m, keyword
+	}
+	if strings.TrimSpace(m.Text) == "" {
+		m.Text = keyword
+	} else {
+		m.Text = strings.TrimSpace(m.Text) + "\n" + keyword
+	}
+	return m, keyword
+}
+
+func fitProviderPayload(m Message, maxRunes int, keyword string, build func(string) ([]byte, error)) ([]byte, error) {
 	text := []rune(strings.TrimSpace(m.Text))
-	if len(text) > maxRunes {
+	keywordSuffix := []rune("\n" + keyword)
+	if keyword != "" && string(text) == keyword {
+		text = nil
+	} else if keyword != "" && len(text) >= len(keywordSuffix) && string(text[len(text)-len(keywordSuffix):]) == string(keywordSuffix) {
+		text = text[:len(text)-len(keywordSuffix)]
+	}
+	truncated := len(text) > maxRunes
+	if truncated {
 		text = text[:maxRunes]
 	}
 	lo, hi := 0, len(text)
@@ -99,8 +131,12 @@ func fitProviderPayload(m Message, maxRunes int, build func(string) ([]byte, err
 	for lo <= hi {
 		mid := (lo + hi) / 2
 		candidateText := string(text[:mid])
-		if mid < len(text) || len([]rune(strings.TrimSpace(m.Text))) > maxRunes {
+		if mid < len(text) || truncated {
 			candidateText += truncationMarker
+		}
+		// Truncation can remove a keyword already present in the source text.
+		if keyword != "" && !strings.Contains(candidateText, keyword) {
+			candidateText += "\n" + keyword
 		}
 		candidate, err := build(candidateText)
 		if err != nil {
@@ -115,6 +151,17 @@ func fitProviderPayload(m Message, maxRunes int, build func(string) ([]byte, err
 	}
 	if best != nil {
 		return best, nil
+	}
+	if keyword != "" {
+		// Keep the keyword even when the provider's byte ceiling leaves no room for the original text.
+		candidate, err := build(truncationMarker + "\n" + keyword)
+		if err != nil {
+			return nil, err
+		}
+		if len(candidate) > DingTalkFeishuMaxBytes {
+			return nil, fmt.Errorf("keyword payload exceeds %d bytes", DingTalkFeishuMaxBytes)
+		}
+		return candidate, nil
 	}
 	return build("")
 }

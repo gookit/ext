@@ -42,6 +42,7 @@ type Provider interface {
 // Options configures a provider without depending on an application config package.
 type Options struct {
 	Secret       string
+	Keyword      string
 	AllowedHosts []string
 	AllowHTTP    bool
 	Timeout      time.Duration

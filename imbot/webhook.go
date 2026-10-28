@@ -29,7 +29,7 @@ type webhookProvider struct {
 func (p *webhookProvider) Send(ctx context.Context, message Message) error {
 	ctx, cancel := context.WithTimeout(ctx, p.opts.Timeout)
 	defer cancel()
-	body, err := RenderMessageWithLimit(p.kind, message, p.opts.MaxTextRunes)
+	body, err := renderMessageWithLimit(p.kind, message, p.opts.Keyword, p.opts.MaxTextRunes)
 	if err != nil {
 		return &DeliveryError{Kind: "render", Err: err}
 	}
