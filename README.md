@@ -37,6 +37,14 @@ window on Windows; it is a no-op on other platforms.
 > [!NOTE]
 > More information please see [./procattr](./procattr).
 
+## Package: servicemgr
+
+`servicemgr` registers a per-user start-at-login entry (Windows Task Scheduler, Linux
+`systemd --user`) with an ownership marker, and can start it once on demand.
+
+> [!NOTE]
+> More information please see [./servicemgr](./servicemgr/README.md).
+
 ## Package: desknotify
 
 `desknotify` sends best-effort desktop notifications using the platform's native helper and degrades cleanly when no desktop is available.
