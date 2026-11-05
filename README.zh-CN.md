@@ -35,6 +35,13 @@ go get github.com/gookit/goutil/ext
 > [!NOTE]
 > 更多信息请查看: [./procattr](./procattr)
 
+## Package: servicemgr
+
+`servicemgr` 注册当前用户的登录自启项（Windows 任务计划程序、Linux `systemd --user`），带所有权标记，并可按需立即启动一次。
+
+> [!NOTE]
+> 更多信息请查看: [./servicemgr](./servicemgr/README.md)
+
 ## Package: desknotify
 
 `desknotify` 使用平台原生辅助程序发送尽力而为的桌面通知；桌面不可用时安全降级。
