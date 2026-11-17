@@ -3,7 +3,7 @@ module github.com/gookit/ext
 go 1.23
 
 require (
-	github.com/gookit/goutil v0.8.4
+	github.com/gookit/goutil v0.9.0
 	golang.org/x/sys v0.30.0
 )
 
